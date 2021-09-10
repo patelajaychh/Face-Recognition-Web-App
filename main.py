@@ -19,26 +19,39 @@ app = FastAPI(tilte = "Video Camera stream over HTML",
 templates = Jinja2Templates(directory="templates/")
 mtcnn = MTCNN()
 
-cap = cv2.VideoCapture(0)
+cap = FileVideoStream(0).start()
 
 
 def gen_frames():
 
-    while True:
-        success, frame = cap.read()
-        f_strt = datetime.now()
-        if not success:
-            break
-        else:
+    skip_frames = 2
 
+    frame_count = 0
+
+    while cap.more():
+
+        frame = cap.read()
+        
+        # Incrementing frame count
+        frame_count+=1
+        if frame_count == 100:
+            frame_count=0
+
+        f_strt = datetime.now()
+        
+        if frame_count%skip_frames==0: # skip every 3rd frame for face detection
+            pass
+        else:
+        
             frame = detect_face(image=frame)
 
-            ret, buffer = cv2.imencode(".jpg", frame)
-            frame = buffer.tobytes()
-            print("FPS:", 1/(datetime.now() - f_strt).total_seconds())
+        ret, buffer = cv2.imencode(".jpg", frame)
+        frame = buffer.tobytes()
 
-            yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        print("FPS:", 1/(datetime.now() - f_strt).total_seconds())
+
+        yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 def detect_face(image):
     """
