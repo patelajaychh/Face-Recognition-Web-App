@@ -1,4 +1,5 @@
 ## Web App for Face Recognition
+- FastAPI based face recognition web application
 - Based on MTCNN face detector and arcface feature extraction network.
 - Uses tensorflow2.x as backend for model loading and inferencing
   
