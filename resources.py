@@ -9,10 +9,6 @@ from models.verifier.rface.lresnet100e_ir import LResNet100E_IR
 import os
 import json
 
-__author__ = "Abhishek Gangwar"
-
-
-
 def resize_tensor(size):
     input_tensor = Input((None, None, 3)) 
     output_tensor = Lambda(lambda x: tf.compat.v1.image.resize_bilinear(x, [size, size]))(input_tensor)
@@ -70,7 +66,17 @@ class SupportMethods(object):
         except:
             pass
         return status        
+
+    def putTextWithBG(img, text, cordinates, fontFace, font_scale, font_thickness, text_color=(255,0,0), bg_color = (255,255,255)):
+
+        text_size, _ = cv2.getTextSize(text, fontFace, font_scale, font_thickness)
+        text_w, text_h = text_size
+        x,y = cordinates
+        cv2.rectangle(img, (x,y-10), (x+text_w, y+text_h), bg_color, -1)
+        cv2.putText(img, text, (x,y), fontFace=fontFace, fontScale=font_scale, color=text_color, thickness=font_thickness)
         
+        return text_size
+
     def read_json_from_paths(enrollfolder_JSON_path, embed_dimension=512):
       '''
       Reads json files and return numpy array of labels and embeds

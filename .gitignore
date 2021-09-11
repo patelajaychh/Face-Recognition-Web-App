@@ -1,3 +1,5 @@
 __pycache__/
 models/
 test_output/
+data/
+enrollment_data/

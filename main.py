@@ -11,6 +11,7 @@ from utils_fr import umeyama
 from resources import SupportMethods
 import tensorflow as tf
 import numpy as np
+import faiss
 
 from fastapi import FastAPI, Response
 from fastapi import responses
@@ -28,11 +29,34 @@ templates = Jinja2Templates(directory="templates/")
 mtcnn = MTCNN()
 feature_net = SupportMethods.build_rface()
 
+similarity_threshold = 0.9
+
 # Test prediction for activating feature_net
 test_img_ = np.full( (112,112, 3), 100, dtype="uint8" )
 test_img_ = test_img_[ np.newaxis, ...]
 feature_net.predict( [test_img_] )
 
+# Loading faiss index if not created already 
+print("INFO: Loading faiss index...........")
+faiss_index_path = 'data/'
+if os.path.exists(f'{faiss_index_path}/faiss_indexed_feature_labels.npy'):
+    labels = np.load(f'{faiss_index_path}/faiss_indexed_feature_labels.npy')
+    feature_index = faiss.read_index(f'{faiss_index_path}/faiss_feature_index')
+else:
+    enrollfolder_JSON_path = './enrollment_data/'
+    features, labels, names = SupportMethods.read_json_from_paths(enrollfolder_JSON_path)
+
+    # Feature Vector Size
+    d = 512              
+    feature_index = faiss.IndexFlatL2(d)            # Index
+    feature_index.add(features)
+    np.save( f'data/faiss_indexed_feature_labels.npy',labels)
+    faiss.write_index(feature_index, f'data/faiss_feature_index')  
+
+    labels = np.load(f'{faiss_index_path}/faiss_indexed_feature_labels.npy')
+    feature_index = faiss.read_index(f'{faiss_index_path}/faiss_feature_index')
+
+    
 # cap = FileVideoStream(0).start() --> this is multithreaded streamer where reading and frame processing is done in different thread
 cap = cv2.VideoCapture(0)
 
@@ -71,7 +95,7 @@ def detect_face(image):
     """
     orig_image = image.copy()
     orig_shape = image.shape
-    scale_factor = 11
+    scale_factor = 8
     new_shape = (ceil(orig_shape[0]/scale_factor), ceil(orig_shape[1]/scale_factor))
 
     print("original Shape:", orig_shape, "\tScaled Shape:", new_shape)
@@ -88,9 +112,22 @@ def detect_face(image):
         cropped_face = orig_image[y:y+height, x:x+width]
         # cv2.imwrite("test_output/test.jpg", cropped_face)
         f1 = get_features(cropped_face)
-        # print(f1)
+
+        k=1
+        D,I = feature_index.search(f1, k)
+        dist = D[0][0]
+        label_idx = I[0][0]
+        username = labels[label_idx]
+        print("Information:",username, dist)
         
-        cv2.rectangle(orig_image, (x,y), (x+width,y+height), color = (0,0,255))
+        
+        if dist<similarity_threshold:
+            # cv2.putText(orig_image, str(username), (x,y-10), fontFace = cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(255,0,0), thickness=1 )
+            cv2.rectangle(orig_image, (x,y), (x+width,y+height), color = (0,255,0) )
+            SupportMethods.putTextWithBG(orig_image, username, (x,y-10), fontFace=cv2.FONT_HERSHEY_SIMPLEX, font_scale=0.5,
+                                         font_thickness=1, text_color=(0,255,0) )
+        else:
+            cv2.rectangle(orig_image, (x,y), (x+width,y+height), color = (0,0,255))
 
     return orig_image
 
